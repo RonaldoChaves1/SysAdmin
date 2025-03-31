@@ -1,0 +1,264 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciador de Pools IIS</title>
+  <style>
+    /* Reset básico de margens e padding */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f7f6;
+      color: #333;
+      padding: 20px;
+    }
+
+    h2 {
+      color: #007bff;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .user-info {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 15px;
+      text-align: right;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+    }
+
+    td {
+      background-color: #f9f9f9;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f1f1f1;
+    }
+
+    tr:hover td {
+      background-color: #e9f1ff;
+    }
+
+    button {
+      padding: 8px 16px;
+      margin: 4px;
+      font-size: 14px;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Botão Iniciar */
+    .start-button {
+      background-color: #28a745;
+    }
+
+      .start-button:hover {
+        background-color: #218838;
+      }
+
+    /* Botão Parar */
+    .stop-button {
+      background-color: #dc3545;
+    }
+
+      .stop-button:hover {
+        background-color: #c82333;
+      }
+
+    .status-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+      border-radius: 50%;
+      margin-left: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    .running {
+      background-color: #28a745; /* Verde */
+    }
+
+    .stopped {
+      background-color: #dc3545; /* Vermelho */
+    }
+
+    .status-cell {
+      align-items: center;
+    }
+
+      .status-cell span {
+        margin-left: 10px;
+        font-size: 14px;
+      }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+      h2 {
+        font-size: 20px;
+      }
+
+      table, button {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Gerenciador de Pools IIS</h2>
+    <!-- Exibe o nome do usuário logado -->
+    <div class="user-info" id="userInfo">
+      Carregando o nome do usuário...
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Nome do Pool</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="poolsTable">
+        <!-- Dados serão inseridos aqui -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const basePath = window.location.pathname.split('/')[1];
+    const hasExtension = basePath && basePath.includes('.');
+    const apiUrl = hasExtension ? '/api' : `/${basePath}/api`;
+
+    // Função para buscar o nome do usuário logado
+    async function fetchUserName() {
+      try {
+        const response = await fetch(`${apiUrl}/user/name`, {
+          method: "GET",
+          credentials: "include" // Necessário se você estiver usando autenticação integrada (Windows Auth)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById("userInfo").innerHTML = `Bem-vindo, ${data.userName}`;
+        } else {
+          document.getElementById("userInfo").innerHTML = "Usuário não identificado.";
+        }
+      } catch (error) {
+        console.error("Erro ao buscar o nome do usuário:", error);
+        document.getElementById("userInfo").innerHTML = "Erro ao carregar nome do usuário.";
+      }
+    }
+
+    // Função para buscar a lista de pools
+    async function fetchPools() {
+      try {
+        const response = await fetch(`${apiUrl}/iis/pools`, {
+          method: "GET",
+          credentials: "include" // Autenticação via AD
+        });
+
+        if (!response.ok) {
+          throw new Error("Erro ao buscar pools");
+        }
+
+        const pools = await response.json();
+        const tableBody = document.getElementById("poolsTable");
+        tableBody.innerHTML = "";
+
+        pools.forEach(pool => {
+          const row = document.createElement("tr");
+
+          // Ícone de status com base no estado do pool
+          const statusIcon = pool.status === "Started" ?
+            '<span class="status-icon running"></span>' :
+            '<span class="status-icon stopped"></span>';
+
+          row.innerHTML = `
+              <td>${pool.name}</td>
+              <td class="status-cell">${statusIcon}<span>${pool.status}</span></td>
+              <td>
+                <button class="start-button" onclick="startPool('${pool.name}')">Iniciar</button>
+                <button class="stop-button" onclick="stopPool('${pool.name}')">Parar</button>
+              </td>
+            `;
+          tableBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error("Erro ao buscar pools:", error);
+        alert("Erro ao carregar a lista de pools.");
+      }
+    }
+
+    async function startPool(poolName) {
+      await managePool("start", poolName);
+    }
+
+    async function stopPool(poolName) {
+      await managePool("stop", poolName);
+    }
+
+    async function managePool(action, poolName) {
+      try {
+        const response = await fetch(`${apiUrl}/iis/${action}/${poolName}`, {
+          method: "POST",
+          credentials: "include" // Autenticação via AD
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erro ao ${action === "start" ? "iniciar" : "parar"} o pool`);
+        }
+
+        alert(await response.text());
+        fetchPools(); // Atualizar a lista de pools
+      } catch (error) {
+        console.error(`Erro ao ${action === "start" ? "iniciar" : "parar"} o pool:`, error);
+        alert("Erro ao realizar a ação.");
+      }
+    }
+
+    // Carregar o nome do usuário e os pools ao iniciar a página
+    fetchUserName();
+    fetchPools();
+  </script>
+</body>
+</html>
