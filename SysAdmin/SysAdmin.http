@@ -1,6 +1,6 @@
 @SysAdmin_HostAddress = http://localhost:5030
 
-GET {{SysAdmin_HostAddress}}/weatherforecast/
+GET {{SysAdmin_HostAddress}}/api/iis/pools
 Accept: application/json
 
 ###

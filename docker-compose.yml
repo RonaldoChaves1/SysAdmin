@@ -1,0 +1,50 @@
+﻿services:
+  # Serviço do Elasticsearch
+  elasticsearch:
+    image: elasticsearch:8.17.4
+    environment:
+      - discovery.type=single-node  # Configuração para rodar o Elasticsearch em modo single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m  # Ajuste de memória (opcional)
+      - xpack.security.enabled=false
+    networks:
+      - elk
+    ports:
+      - "9200:9200"  # Porta para o Elasticsearch
+
+  # Serviço do Kibana
+  kibana:
+    image: kibana:8.17.4
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - elk
+    ports:
+      - "5601:5601"  # Porta para o Kibana
+
+  # Serviço do Logstash
+  logstash:
+    image: logstash:8.17.4
+    environment:
+      - LOGSTASH_INPUT_HTTP_PORT=5044
+    networks:
+      - elk
+    ports:
+      - "5044:5044"  # Porta para o Logstash
+
+  # Serviço da aplicação SysAdmin
+  sysadmin:
+    build: .
+    container_name: sysadmin-app
+    networks:
+      - elk
+    ports:
+      - "8080:8080"  # Ajuste a porta conforme necessário
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ELASTICSEARCH_URL=http://elasticsearch:9200  # Configuração para conectar no Elasticsearch
+    depends_on:
+      - elasticsearch  # A aplicação vai depender do Elasticsearch estar em funcionamento
+
+networks:
+  elk:
+    driver: bridge
